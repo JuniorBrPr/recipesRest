@@ -1,25 +1,34 @@
 package recipes;
 
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
+import recipes.models.DTOs;
 import recipes.models.Recipe;
+import recipes.models.RecipeRepository;
 
 @RestController
 public class RecipesController {
-    private final Recipe recipe = new Recipe();
+    private final RecipeRepository recipeRepository;
 
-    @GetMapping("/api/recipe")
-    public Recipe getRecipe() {
-        return recipe;
+    @Autowired
+    public RecipesController(RecipeRepository recipeRepository) {
+        this.recipeRepository = recipeRepository;
     }
 
-    @PostMapping("/api/recipe")
-    public void postRecipe(@RequestBody Recipe recipe2) {
-        recipe.setName(recipe2.getName());
-        recipe.setDescription(recipe2.getDescription());
-        recipe.setIngredients(recipe2.getIngredients());
-        recipe.setDirections(recipe2.getDirections());
+    @GetMapping("/api/recipe/{id}")
+    public ResponseEntity<?> getRecipe(@PathVariable int id) {
+        Recipe recipe = recipeRepository.getRecipe(id);
+        if (recipe == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Recipe not found");
+        }
+        return new ResponseEntity<>(recipe, HttpStatus.OK);
+    }
+
+    @PostMapping("/api/recipe/new")
+    public DTOs.RecipeIdDTO postRecipe(@RequestBody Recipe recipe2) {
+        return new DTOs.RecipeIdDTO(recipeRepository.addRecipe(recipe2));
     }
 }
