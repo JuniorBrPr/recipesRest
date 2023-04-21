@@ -1,26 +1,26 @@
 package recipes;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 import recipes.models.DTOs;
 import recipes.models.Recipe;
-import recipes.models.RecipeRepository;
+
+import javax.validation.Valid;
 
 @RestController
 public class RecipesController {
-    private final RecipeRepository recipeRepository;
+    private final RecipesRepository recipesRepository;
 
-    @Autowired
-    public RecipesController(RecipeRepository recipeRepository) {
-        this.recipeRepository = recipeRepository;
+    public RecipesController(RecipesRepository recipesRepository) {
+        this.recipesRepository = recipesRepository;
     }
 
+
     @GetMapping("/api/recipe/{id}")
-    public ResponseEntity<?> getRecipe(@PathVariable int id) {
-        Recipe recipe = recipeRepository.getRecipe(id);
+    public ResponseEntity<?> getRecipe(@PathVariable long id) {
+        Recipe recipe = recipesRepository.findById(id);
         if (recipe == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Recipe not found");
         }
@@ -28,7 +28,26 @@ public class RecipesController {
     }
 
     @PostMapping("/api/recipe/new")
-    public DTOs.RecipeIdDTO postRecipe(@RequestBody Recipe recipe2) {
-        return new DTOs.RecipeIdDTO(recipeRepository.addRecipe(recipe2));
+    public DTOs.RecipeIdDTO postRecipe(@Valid @RequestBody Recipe recipe2) {
+        if (recipe2 == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Recipe not saved");
+        }
+        long id = recipesRepository.save(recipe2).getId();
+
+        if (id != 0) {
+            return new DTOs.RecipeIdDTO(id);
+        } else {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Recipe not saved");
+        }
+    }
+
+    @DeleteMapping("/api/recipe/{id}")
+    public ResponseEntity<?> deleteRecipe(@PathVariable long id) {
+        Recipe recipe = recipesRepository.findById(id);
+        if (recipe == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Recipe not found");
+        }
+        recipesRepository.delete(recipe);
+        return new ResponseEntity<>(HttpStatus.NO_CONTENT);
     }
 }
