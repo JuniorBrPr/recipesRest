@@ -1,25 +1,29 @@
-package recipes;
+package recipes.controllers;
 
+import lombok.AllArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 import recipes.models.DTOs;
 import recipes.models.Recipe;
+import recipes.models.User;
+import recipes.repos.RecipesRepository;
+import recipes.repos.UsersRepository;
 
 import javax.validation.Valid;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.Date;
+import java.util.Optional;
 
 @RestController
+@AllArgsConstructor
 public class RecipesController {
     private final RecipesRepository recipesRepository;
-
-    public RecipesController(RecipesRepository recipesRepository) {
-        this.recipesRepository = recipesRepository;
-    }
-
+    private final UsersRepository usersRepository;
 
     @GetMapping("/api/recipe/{id}")
     public ResponseEntity<?> getRecipe(@PathVariable long id) {
@@ -31,15 +35,22 @@ public class RecipesController {
     }
 
     @PostMapping("/api/recipe/new")
-    public DTOs.RecipeIdDTO postRecipe(@Valid @RequestBody Recipe recipe) {
+    public ResponseEntity<?> postRecipe(@Valid @RequestBody Recipe recipe) {
         if (recipe == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Recipe not saved");
         }
+        Optional<User> user = usersRepository
+                .findByEmail(SecurityContextHolder.getContext().getAuthentication().getName());
+
+        recipe.setUser(user.orElseThrow(() -> new UsernameNotFoundException(
+                "Username not found: " + SecurityContextHolder.getContext().getAuthentication().getName())));
+
         recipe.setDate(Date.from(LocalDateTime.now().toInstant(ZoneOffset.ofHours(1))));
+
         long id = recipesRepository.save(recipe).getId();
 
         if (id != 0) {
-            return new DTOs.RecipeIdDTO(id);
+            return new ResponseEntity<>(new DTOs.idDTO(id), HttpStatus.OK);
         } else {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Recipe not saved");
         }
@@ -51,20 +62,40 @@ public class RecipesController {
         if (recipe == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Recipe not found");
         }
+
+        if (recipe.getUser() != null && !recipe.getUser().getEmail().equals(SecurityContextHolder.getContext()
+                .getAuthentication().getName())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You do not have permission to delete this recipe");
+        }
+
         recipesRepository.delete(recipe);
         return new ResponseEntity<>(HttpStatus.NO_CONTENT);
     }
 
     @PutMapping("/api/recipe/{id}")
     public ResponseEntity<?> putRecipe(@PathVariable long id, @Valid @RequestBody Recipe recipe) {
-        if (recipesRepository.findById(id) == null) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Recipe not found");
-        }
+        Recipe recipe1 = recipesRepository.findById(id);
         if (recipe == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Recipe not saved");
         }
+        if (recipe1 == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Recipe not found");
+        }
+        if (recipe1.getUser() != null && !recipesRepository
+                .findById(id).getUser().getEmail().equals(SecurityContextHolder.getContext()
+                        .getAuthentication().getName())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You do not have permission to edit this recipe");
+        }
+        if (recipe.getUser() == null) {
+            recipe.setUser(usersRepository.findByEmail(SecurityContextHolder.getContext().getAuthentication().getName())
+                    .orElseThrow(() ->
+                            new UsernameNotFoundException(
+                                    "Username not found: " +
+                                            SecurityContextHolder.getContext().getAuthentication().getName())));
+        }
         recipe.setId(id);
         recipe.setDate(Date.from(LocalDateTime.now().toInstant(ZoneOffset.ofHours(1))));
+
         recipesRepository.save(recipe);
         return new ResponseEntity<>(HttpStatus.NO_CONTENT);
     }

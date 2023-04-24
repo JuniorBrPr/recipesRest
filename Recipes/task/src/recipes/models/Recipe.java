@@ -8,7 +8,6 @@ import lombok.NoArgsConstructor;
 import javax.persistence.*;
 import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.NotEmpty;
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -34,6 +33,10 @@ public class Recipe {
 
     @Temporal(TemporalType.TIMESTAMP)
     Date date;
+
+    @JsonIgnore
+    @ManyToOne
+    private User user;
 
     @NotEmpty
     @ElementCollection
